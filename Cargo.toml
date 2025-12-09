@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "wgpu-playground",
+    "raytracer",
+    "terminal-visuals",
+]
+
+
