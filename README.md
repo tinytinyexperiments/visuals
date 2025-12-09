@@ -1,4 +1,7 @@
-## Visuals Workspace
+
+## Visuals Workspace!
+
+<img width="412" height="277" alt="Screenshot 2025-12-08 at 11 08 55 PM" src="https://github.com/user-attachments/assets/05fb9981-394f-4b30-a26d-919b3e9bbf50" />
 
 This repo is a Rust playground for different kinds of visuals:
 
