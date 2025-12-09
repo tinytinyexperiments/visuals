@@ -65,8 +65,8 @@ fn fs_main(in: VSOut) -> @location(0) vec4<f32> {
 }
 "#;
 
-struct State {
-    surface: wgpu::Surface<'static>,
+struct State<'window> {
+    surface: wgpu::Surface<'window>,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
@@ -76,14 +76,14 @@ struct State {
     start_instant: Instant,
 }
 
-impl State {
-    async fn new(window: &winit::window::Window) -> Self {
+impl<'window> State<'window> {
+    async fn new(window: &'window winit::window::Window) -> Self {
         let size = window.inner_size();
 
         let instance = wgpu::Instance::default();
-        // SAFETY: window outlives surface
-        let surface =
-            unsafe { instance.create_surface(window) }.expect("Failed to create surface");
+        let surface = instance
+            .create_surface(window)
+            .expect("Failed to create surface");
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -295,7 +295,7 @@ fn main() {
     let mut state = pollster::block_on(State::new(&window));
 
     event_loop
-        .run(move |event, elwt| match event {
+        .run(|event, elwt| match event {
             Event::WindowEvent { event, window_id } if window_id == window.id() => match event {
                 WindowEvent::CloseRequested => elwt.exit(),
                 WindowEvent::Resized(size) => state.resize(size),
@@ -317,6 +317,9 @@ fn main() {
                     }
                     Err(wgpu::SurfaceError::Timeout) => {
                         eprintln!("Surface timeout");
+                    }
+                    Err(wgpu::SurfaceError::Other) => {
+                        eprintln!("Surface error: Other");
                     }
                 }
                 window.request_redraw();
