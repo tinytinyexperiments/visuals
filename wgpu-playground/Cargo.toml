@@ -7,5 +7,6 @@ edition = "2021"
 wgpu = "*"
 winit = "*"
 pollster = "*"
+bytemuck = { version = "*", features = ["derive"] }
 
 
