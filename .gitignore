@@ -1,0 +1,16 @@
+target/
+**/target/
+
+# Cargo lockfile for libraries (keep if this becomes an app only)
+Cargo.lock
+
+# Editor / OS files
+.DS_Store
+*.log
+
+.idea/
+.vscode/
+*.swp
+*.swo
+
+

@@ -13,6 +13,18 @@ Each is a separate crate in a single Cargo workspace.
 - **Rust toolchain** (via `rustup`)
 - On macOS, you should be fine out of the box for `wgpu` (it uses Metal under the hood).
 
+Install Rust (this gives you `cargo`):
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+```
+
+Then either **restart your terminal** or run:
+
+```bash
+. "$HOME/.cargo/env"
+```
+
 From the workspace root:
 
 ```bash
