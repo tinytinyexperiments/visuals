@@ -1,4 +1,4 @@
-use std::io::{stdout, Write};
+use std::io::{stdout, Write, Result};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -9,7 +9,7 @@ use crossterm::{
     terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
 };
 
-fn draw_frame<W: Write>(out: &mut W, t: f32, width: u16, height: u16) -> crossterm::Result<()> {
+fn draw_frame<W: Write>(out: &mut W, t: f32, width: u16, height: u16) -> Result<()> {
     // animated ASCII Mandelbrot zoom
     let (w, h) = (width as f32, height as f32);
     let aspect = if h > 0.0 { w / h } else { 1.0 };
@@ -56,13 +56,13 @@ fn draw_frame<W: Write>(out: &mut W, t: f32, width: u16, height: u16) -> crosste
 
 static ASCII_LUT: &[char] = &[' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'];
 
-fn main() -> crossterm::Result<()> {
+fn main() -> Result<()> {
     let mut stdout = stdout();
 
     execute!(stdout, EnterAlternateScreen)?;
     terminal::enable_raw_mode()?;
 
-    let res = (|| -> crossterm::Result<()> {
+    let res = (|| -> Result<()> {
         let mut t: f32 = 0.0;
         loop {
             let (width, height) = terminal::size()?;
