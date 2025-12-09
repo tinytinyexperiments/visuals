@@ -10,9 +10,10 @@ use crossterm::{
 };
 
 fn draw_frame<W: Write>(out: &mut W, t: f32, width: u16, height: u16) -> Result<()> {
-    // animated ASCII Mandelbrot zoom
+    // animated ASCII Mandelbrot zoom with color cycling
     let (w, h) = (width as f32, height as f32);
-    let aspect = if h > 0.0 { w / h } else { 1.0 };
+    // terminal cells are usually taller than they are wide, so compensate a bit
+    let aspect = if h > 0.0 { (w / h) * 0.5 } else { 1.0 };
 
     let zoom = 1.0 + 0.5 * (t * 0.2).sin();
     let cx = -0.5 + 0.3 * (t * 0.05).cos();
@@ -47,7 +48,21 @@ fn draw_frame<W: Write>(out: &mut W, t: f32, width: u16, height: u16) -> Result<
 
             let idx = (shade * (ASCII_LUT.len() - 1) as f32) as usize;
             let ch = ASCII_LUT[idx];
-            execute!(out, Print(ch))?;
+
+            // color based on iteration and position
+            let hue = shade + (x as f32 / w) * 0.3 + (y as f32 / h) * 0.2 + t * 0.1;
+            let r = (0.5 + 0.5 * (hue * 6.2831).sin()) * 255.0;
+            let g = (0.5 + 0.5 * (hue * 6.2831 + 2.094).sin()) * 255.0;
+            let b = (0.5 + 0.5 * (hue * 6.2831 + 4.188).sin()) * 255.0;
+            execute!(
+                out,
+                SetForegroundColor(Color::Rgb {
+                    r: r as u8,
+                    g: g as u8,
+                    b: b as u8
+                }),
+                Print(ch)
+            )?;
         }
     }
 

@@ -38,30 +38,116 @@ fn vs_main(@builtin(vertex_index) vi: u32) -> VSOut {
     return out;
 }
 
+fn rot_y(a: f32) -> mat3x3<f32> {
+    let c = cos(a);
+    let s = sin(a);
+    return mat3x3<f32>(
+        c, 0.0, -s,
+        0.0, 1.0, 0.0,
+        s, 0.0, c,
+    );
+}
+
+fn nugget_sdf(p: vec3<f32>, t: f32) -> f32 {
+    // rotate the nugget over time
+    let r = rot_y(t * 0.7);
+    var q = r * p;
+
+    // base blobby sphere
+    var d = length(q) - 0.8;
+
+    // a few lumpy bits
+    d = min(d, length(q - vec3<f32>(0.35, 0.15, 0.1)) - 0.35);
+    d = min(d, length(q - vec3<f32>(-0.3, -0.2, 0.2)) - 0.3);
+    d = min(d, length(q - vec3<f32>(0.1, 0.25, -0.25)) - 0.28);
+
+    // small sinusoidal roughness to feel crunchy
+    let rough = 0.08 * (sin(q.x * 8.0) * sin(q.y * 9.0) * sin(q.z * 7.0));
+    d = d + rough;
+
+    return d;
+}
+
+fn map_scene(p: vec3<f32>, t: f32) -> f32 {
+    return nugget_sdf(p, t);
+}
+
+fn estimate_normal(p: vec3<f32>, t: f32) -> vec3<f32> {
+    let e = 0.001;
+    let d = map_scene(p, t);
+    let nx = map_scene(p + vec3<f32>(e, 0.0, 0.0), t) - d;
+    let ny = map_scene(p + vec3<f32>(0.0, e, 0.0), t) - d;
+    let nz = map_scene(p + vec3<f32>(0.0, 0.0, e), t) - d;
+    return normalize(vec3<f32>(nx, ny, nz));
+}
+
 @fragment
 fn fs_main(in: VSOut) -> @location(0) vec4<f32> {
-    let p = (in.uv - vec2<f32>(0.5, 0.5)) * 3.0;
-    let t = globals.time * 0.25;
+    // normalized screen coordinates
+    let uv = in.uv * 2.0 - vec2<f32>(1.0, 1.0);
+    let aspect = 800.0 / 600.0;
+    let p = vec2<f32>(uv.x * aspect, uv.y);
 
-    var z = p;
-    var acc: f32 = 0.0;
+    let t = globals.time;
 
-    for (var i: i32 = 0; i < 32; i = i + 1) {
-        z = vec2<f32>(
-            z.x * z.x - z.y * z.y,
-            2.0 * z.x * z.y
-        ) + vec2<f32>(0.35 + 0.15 * sin(t), 0.5 * cos(t));
+    // camera setup
+    let ro = vec3<f32>(0.0, 0.2, 3.0);
+    let rd = normalize(vec3<f32>(p.x, p.y, -1.8));
 
-        acc = acc + 0.02 / (dot(z, z) + 0.001);
+    // raymarch
+    var dist = 0.0;
+    var hit = false;
+    var pos = ro;
+
+    for (var i: i32 = 0; i < 96; i = i + 1) {
+        pos = ro + rd * dist;
+        let d = map_scene(pos, t);
+        if d < 0.002 {
+            hit = true;
+            break;
+        }
+        dist = dist + d;
+        if dist > 8.0 {
+            break;
+        }
     }
 
-    let c = vec3<f32>(
-        0.5 + 0.5 * sin(acc + t * 2.0),
-        0.5 + 0.5 * sin(acc * 1.3 + t * 1.7),
-        0.5 + 0.5 * sin(acc * 0.7 + t * 2.3),
-    );
+    var col = vec3<f32>(0.02, 0.0, 0.06);
 
-    return vec4<f32>(c, 1.0);
+    if hit {
+        let n = estimate_normal(pos, t);
+
+        let light_dir = normalize(vec3<f32>(-0.4, 0.7, 0.3));
+        let diff = max(dot(n, light_dir), 0.0);
+
+        // simple fake subsurface / bounce from below
+        let subsurf = max(dot(n, vec3<f32>(0.0, -1.0, 0.0)), 0.0);
+
+        // crunchy nugget base color
+        let base = vec3<f32>(0.85, 0.55, 0.2);
+
+        let nugget = base * (0.25 + 0.85 * diff) + vec3<f32>(0.3, 0.15, 0.05) * subsurf;
+
+        // slight rim light
+        let view_dir = normalize(ro - pos);
+        let rim = pow(1.0 - max(dot(n, view_dir), 0.0), 3.0);
+
+        col = nugget + rim * vec3<f32>(1.0, 0.8, 0.5);
+    } else {
+        // background gradient
+        let y = p.y * 0.5 + 0.5;
+        col = mix(
+            vec3<f32>(0.02, 0.0, 0.05),
+            vec3<f32>(0.1, 0.0, 0.15),
+            y
+        );
+    }
+
+    // clamp and slight gamma
+    col = min(col, vec3<f32>(1.0, 1.0, 1.0));
+    col = pow(col, vec3<f32>(0.8, 0.8, 0.8));
+
+    return vec4<f32>(col, 1.0);
 }
 "#;
 
