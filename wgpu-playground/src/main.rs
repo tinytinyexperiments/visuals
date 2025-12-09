@@ -1,12 +1,7 @@
 use std::time::Instant;
 
 use wgpu::util::DeviceExt;
-use winit::{
-    dpi::LogicalSize,
-    event::*,
-    event_loop::EventLoop,
-    window::WindowBuilder,
-};
+use winit::{dpi::LogicalSize, event::*, event_loop::EventLoop};
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -100,14 +95,14 @@ impl State {
             .expect("No suitable GPU adapters found on the system!");
 
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::default(),
-                },
-                None,
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                label: None,
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                experimental_features: wgpu::ExperimentalFeatures::default(),
+                memory_hints: wgpu::MemoryHints::default(),
+                trace: wgpu::Trace::default(),
+            })
             .await
             .expect("Failed to create device");
 
@@ -125,6 +120,7 @@ impl State {
             width: size.width,
             height: size.height,
             present_mode: wgpu::PresentMode::Fifo,
+            desired_maximum_frame_latency: 2,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
         };
@@ -182,18 +178,10 @@ impl State {
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
-                entry_point: "vs_main",
+                entry_point: Some("vs_main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 buffers: &[],
             },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
@@ -209,7 +197,18 @@ impl State {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
             multiview: None,
+            cache: None,
         });
 
         Self {
@@ -255,6 +254,7 @@ impl State {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
+                    depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -263,10 +263,12 @@ impl State {
                             b: 0.0,
                             a: 1.0,
                         }),
-                        store: true,
+                        store: wgpu::StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
             });
 
             rpass.set_pipeline(&self.render_pipeline);
@@ -281,13 +283,13 @@ impl State {
 }
 
 fn main() {
-    env_logger::init();
-
     let event_loop = EventLoop::new().unwrap();
-    let window = WindowBuilder::new()
-        .with_title("wgpu playground - neon fractal")
-        .with_inner_size(LogicalSize::new(800.0, 600.0))
-        .build(&event_loop)
+    let window = event_loop
+        .create_window(
+            winit::window::WindowAttributes::default()
+                .with_title("wgpu playground - neon fractal")
+                .with_inner_size(LogicalSize::new(800.0, 600.0)),
+        )
         .unwrap();
 
     let mut state = pollster::block_on(State::new(&window));
@@ -297,8 +299,8 @@ fn main() {
             Event::WindowEvent { event, window_id } if window_id == window.id() => match event {
                 WindowEvent::CloseRequested => elwt.exit(),
                 WindowEvent::Resized(size) => state.resize(size),
-                WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                    state.resize(*new_inner_size)
+                WindowEvent::ScaleFactorChanged { .. } => {
+                    // We'll get a Resized event as well; handle resize there.
                 }
                 _ => {}
             },

@@ -4,5 +4,6 @@ members = [
     "raytracer",
     "terminal-visuals",
 ]
+resolver = "2"
 
 
